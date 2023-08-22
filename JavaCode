@@ -1,6 +1,9 @@
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
+
 public class SalesTaxCalculator {
 
     public static void main(String[] args) {
@@ -10,75 +13,75 @@ public class SalesTaxCalculator {
         int numItems = scanner.nextInt();
         scanner.nextLine(); 
 
-        Item[] items = new Item[numItems];
+        List<Item> items = new ArrayList<>();
+
+        System.out.println("Enter the items :-");
 
         for (int i = 0; i < numItems; i++) {
-            System.out.println("Enter details for item " + (i + 1) + ":");
-            System.out.print("Item name: ");
-            String itemName = scanner.nextLine();
-            System.out.print("Item price: ");
-            BigDecimal itemPrice = scanner.nextBigDecimal();
-            scanner.nextLine(); 
-            System.out.print("Is the item imported? (yes/no): ");
-            boolean isImported = scanner.nextLine().equalsIgnoreCase("yes");
+            String input = scanner.nextLine();
 
-            items[i] = new Item(itemName, itemPrice, isImported);
+            items.add(Item.parse(input));
         }
 
         scanner.close();
 
         
         for (Item item : items) {
-            calculateAndPrintReceipt(item);
+            item.calculateAndPrintReceipt();
         }
-    }
 
-    
-    public static BigDecimal calculateSalesTax(BigDecimal itemPrice, BigDecimal taxRate) {
-        BigDecimal salesTax = itemPrice.multiply(taxRate);
-        salesTax = roundToNearestFiveCents(salesTax);
-        return salesTax;
-    }
+        
+        BigDecimal totalSalesTaxes = BigDecimal.ZERO;
+        BigDecimal totalAmount = BigDecimal.ZERO;
 
-   
-    public static BigDecimal roundToNearestFiveCents(BigDecimal value) {
-        BigDecimal nearest = value.divide(new BigDecimal("0.05"), 0, RoundingMode.UP);
-        return nearest.multiply(new BigDecimal("0.05"));
-    }
+        for (Item item : items) {
+            BigDecimal salesTax = item.calculateSalesTax();
+            BigDecimal finalPrice = item.getPrice().add(salesTax);
 
-   
-    public static void calculateAndPrintReceipt(Item item) {
-        BigDecimal basicSalesTaxRate = new BigDecimal("0.10"); 
-        BigDecimal importDutyRate = new BigDecimal("0.05"); 
+            totalSalesTaxes = totalSalesTaxes.add(salesTax);
+            totalAmount = totalAmount.add(finalPrice);
+        }
 
-        BigDecimal basicSalesTax = calculateSalesTax(item.getPrice(), basicSalesTaxRate);
-        BigDecimal importDuty = item.isImported() ? calculateSalesTax(item.getPrice(), importDutyRate) : BigDecimal.ZERO;
-
-        BigDecimal finalPrice = item.getPrice().add(basicSalesTax).add(importDuty);
-
-        System.out.println("Receipt:");
-        System.out.println("Item: " + item.getName());
-        System.out.println("Price (before tax): $" + item.getPrice());
-        System.out.println("Basic Sales Tax: $" + basicSalesTax);
-        System.out.println("Import Duty: $" + importDuty);
-        System.out.println("Total Price: $" + finalPrice);
-        System.out.println();
+        System.out.println("Sales Taxes: $" + totalSalesTaxes);
+        System.out.println("Total: $" + totalAmount);
     }
 }
 
-class Item {
-    private String name;
+interface Taxable {
+    BigDecimal calculateSalesTax();
+}
+
+class Item implements Taxable {
+    private int quantity;
+    private String description;
     private BigDecimal price;
     private boolean isImported;
 
-    public Item(String name, BigDecimal price, boolean isImported) {
-        this.name = name;
+    public Item(int quantity, String description, BigDecimal price, boolean isImported) {
+        this.quantity = quantity;
+        this.description = description;
         this.price = price;
         this.isImported = isImported;
     }
 
-    public String getName() {
-        return name;
+    public static Item parse(String input) {
+        String[] parts = input.split(" at ");
+        if (parts.length == 2) {
+            String[] itemInfo = parts[0].split("\\s+");
+            if (itemInfo.length >= 3) {
+                int quantity = Integer.parseInt(itemInfo[0]);
+                boolean isImported = input.contains("imported");
+                String description = input.substring(input.indexOf(itemInfo[1]), input.indexOf(" at "));
+                BigDecimal price = new BigDecimal(parts[1]);
+
+                return new Item(quantity, description, price, isImported);
+            }
+        }
+        throw new IllegalArgumentException("Invalid input format: " + input);
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public BigDecimal getPrice() {
@@ -87,5 +90,35 @@ class Item {
 
     public boolean isImported() {
         return isImported;
+    }
+
+    @Override
+    public BigDecimal calculateSalesTax() {
+        BigDecimal basicSalesTaxRate = isExempted() ? BigDecimal.ZERO : new BigDecimal("0.10"); 
+        BigDecimal importDutyRate = isImported ? BigDecimal.valueOf(0.05) : BigDecimal.ZERO; 
+
+        BigDecimal basicSalesTax = price.multiply(basicSalesTaxRate);
+        basicSalesTax = roundToNearestFiveCents(basicSalesTax);
+        BigDecimal importDuty = price.multiply(importDutyRate);
+        importDuty = roundToNearestFiveCents(importDuty);
+
+        return basicSalesTax.add(importDuty);
+    }
+
+    public void calculateAndPrintReceipt() {
+        BigDecimal salesTax = calculateSalesTax();
+        BigDecimal finalPrice = price.add(salesTax);
+
+        System.out.println(quantity + " " + description + ": " + finalPrice);
+    }
+
+    private BigDecimal roundToNearestFiveCents(BigDecimal value) {
+        BigDecimal nearest = value.divide(new BigDecimal("0.05"), 0, RoundingMode.UP);
+        return nearest.multiply(new BigDecimal("0.05"));
+    }
+
+    private boolean isExempted() {
+        
+        return description.toLowerCase().contains("book") || description.toLowerCase().contains("food") || description.toLowerCase().contains("medicine");
     }
 }
