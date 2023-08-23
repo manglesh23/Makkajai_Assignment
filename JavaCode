@@ -4,14 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-public class SalesTaxCalculator {
-
+class SalesTaxCalculator {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
         System.out.print("Enter the number of items: ");
         int numItems = scanner.nextInt();
-        scanner.nextLine(); 
+        scanner.nextLine();
 
         List<Item> items = new ArrayList<>();
 
@@ -19,39 +18,55 @@ public class SalesTaxCalculator {
 
         for (int i = 0; i < numItems; i++) {
             String input = scanner.nextLine();
-
             items.add(Item.parse(input));
         }
 
         scanner.close();
 
-        
-        for (Item item : items) {
-            item.calculateAndPrintReceipt();
-        }
 
-        
-        BigDecimal totalSalesTaxes = BigDecimal.ZERO;
-        BigDecimal totalAmount = BigDecimal.ZERO;
+        ReceiptCalculator calculator = new ReceiptCalculator();
+        calculator.calculateAndPrintReceipts(items);
 
-        for (Item item : items) {
-            BigDecimal salesTax = item.calculateSalesTax();
-            BigDecimal finalPrice = item.getPrice().add(salesTax);
 
-            totalSalesTaxes = totalSalesTaxes.add(salesTax);
-            totalAmount = totalAmount.add(finalPrice);
-        }
+        BigDecimal totalSalesTaxes = calculator.calculateTotalSalesTaxes(items);
+        BigDecimal totalAmount = calculator.calculateTotalAmount(items);
 
         System.out.println("Sales Taxes: $" + totalSalesTaxes);
         System.out.println("Total: $" + totalAmount);
     }
 }
 
-interface Taxable {
-    BigDecimal calculateSalesTax();
+class ReceiptCalculator {
+    public void calculateAndPrintReceipts(List<Item> items) {
+        for (Item item : items) {
+            item.calculateAndPrintReceipt();
+        }
+    }
+
+    public BigDecimal calculateTotalSalesTaxes(List<Item> items) {
+        BigDecimal totalSalesTaxes = BigDecimal.ZERO;
+
+        for (Item item : items) {
+            BigDecimal salesTax = item.calculateSalesTax();
+            totalSalesTaxes = totalSalesTaxes.add(salesTax);
+        }
+
+        return totalSalesTaxes;
+    }
+
+    public BigDecimal calculateTotalAmount(List<Item> items) {
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (Item item : items) {
+            BigDecimal finalPrice = item.getPrice().add(item.calculateSalesTax());
+            totalAmount = totalAmount.add(finalPrice);
+        }
+
+        return totalAmount;
+    }
 }
 
-class Item implements Taxable {
+class Item {
     private int quantity;
     private String description;
     private BigDecimal price;
@@ -92,9 +107,8 @@ class Item implements Taxable {
         return isImported;
     }
 
-    @Override
     public BigDecimal calculateSalesTax() {
-        BigDecimal basicSalesTaxRate = isExempted() ? BigDecimal.ZERO : new BigDecimal("0.10"); 
+        BigDecimal basicSalesTaxRate = isExempted() ? BigDecimal.ZERO : new BigDecimal("0.10");
         BigDecimal importDutyRate = isImported ? BigDecimal.valueOf(0.05) : BigDecimal.ZERO; 
 
         BigDecimal basicSalesTax = price.multiply(basicSalesTaxRate);
@@ -118,7 +132,6 @@ class Item implements Taxable {
     }
 
     private boolean isExempted() {
-        
         return description.toLowerCase().contains("book") || description.toLowerCase().contains("food") || description.toLowerCase().contains("medicine");
     }
 }
